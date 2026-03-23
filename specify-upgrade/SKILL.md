@@ -101,6 +101,45 @@ echo "{new}" > "$HOME/.claude/skills/specify/VERSION"
 echo "{old}" > "$HOME/.gstack/specify-just-upgraded-from"
 ```
 
+## Step 7: Publish to the distribution repo
+
+```bash
+_DIST_REPO="$HOME/.claude/skills/specify-skills"
+```
+
+Check if the distribution repo exists:
+```bash
+[ -d "$_DIST_REPO/.git" ] && echo "DIST_REPO_EXISTS" || echo "DIST_REPO_MISSING"
+```
+
+If `DIST_REPO_MISSING`: tell the user "Local upgrade done. Distribution repo not found at `~/.claude/skills/specify-skills` — skipping publish. To set it up: `git clone git@github.com:salah-saleh/specify.git ~/.claude/skills/specify-skills`"
+
+If `DIST_REPO_EXISTS`:
+
+1. Sync the updated skill directories into the repo:
+```bash
+for skill_dir in "$HOME/.claude/skills/specify"*/; do
+  skill_name="$(basename "$skill_dir")"
+  # skip specify-skills itself to avoid recursion
+  [ "$skill_name" = "specify-skills" ] && continue
+  cp -r "$skill_dir" "$_DIST_REPO/"
+done
+# also sync root VERSION
+cp "$HOME/.claude/skills/specify/VERSION" "$_DIST_REPO/VERSION"
+```
+
+2. Commit and push:
+```bash
+cd "$_DIST_REPO"
+git add -A
+git diff --cached --stat
+git -c commit.gpgsign=false commit -m "Upgrade to spec-kit v{new}"
+git push origin main
+```
+
+If the push succeeds: tell the user "Published to `salah-saleh/specify` — colleagues will get v{new} on their next `git pull`."
+If it fails: tell the user what the git error was and suggest they run `cd ~/.claude/skills/specify-skills && git push` manually.
+
 Tell the user: "Upgraded `/specify` skill suite to spec-kit v{new}. Templates updated. Changes take effect in the next session."
 
 Show the changelog highlights again as a reminder of what changed.
