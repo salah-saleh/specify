@@ -116,7 +116,14 @@ If `DIST_REPO_MISSING`: tell the user "Local upgrade done. Distribution repo not
 
 If `DIST_REPO_EXISTS`:
 
-1. Sync the updated skill directories into the repo:
+1. Read the current repo version and compute the next patch version:
+```bash
+_REPO_VERSION=$(cat "$_DIST_REPO/VERSION" 2>/dev/null | tr -d '[:space:]' || echo "1.0.0")
+# bump patch: 1.0.0 -> 1.0.1
+_NEXT_VERSION=$(echo "$_REPO_VERSION" | awk -F. '{printf "%s.%s.%s", $1, $2, $3+1}')
+```
+
+2. Sync the updated skill directories into the repo:
 ```bash
 for skill_dir in "$HOME/.claude/skills/specify"*/; do
   skill_name="$(basename "$skill_dir")"
@@ -124,20 +131,20 @@ for skill_dir in "$HOME/.claude/skills/specify"*/; do
   [ "$skill_name" = "specify-skills" ] && continue
   cp -r "$skill_dir" "$_DIST_REPO/"
 done
-# also sync root VERSION
-cp "$HOME/.claude/skills/specify/VERSION" "$_DIST_REPO/VERSION"
+# bump the repo's own VERSION (separate from spec-kit version)
+echo "$_NEXT_VERSION" > "$_DIST_REPO/VERSION"
 ```
 
-2. Commit and push:
+3. Commit and push:
 ```bash
 cd "$_DIST_REPO"
 git add -A
 git diff --cached --stat
-git -c commit.gpgsign=false commit -m "Upgrade to spec-kit v{new}"
+git -c commit.gpgsign=false commit -m "Release v{_NEXT_VERSION} (spec-kit v{new})"
 git push origin main
 ```
 
-If the push succeeds: tell the user "Published to `salah-saleh/specify` — colleagues will get v{new} on their next `git pull`."
+If the push succeeds: tell the user "Published `salah-saleh/specify` v{_NEXT_VERSION} (tracking spec-kit v{new}) — colleagues will get it on their next `git pull`."
 If it fails: tell the user what the git error was and suggest they run `cd ~/.claude/skills/specify-skills && git push` manually.
 
 Tell the user: "Upgraded `/specify` skill suite to spec-kit v{new}. Templates updated. Changes take effect in the next session."
