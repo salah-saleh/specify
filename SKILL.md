@@ -37,10 +37,6 @@ This is the entry point. Based on what you asked, invoke the right subskill:
 source "$HOME/.claude/skills/specify/bin/preamble.sh"
 ```
 
-Handle `UPDATE` line:
-- `JUST_UPGRADED <old> <new>` → tell user "Running specify v{new} (just updated!)"
-- `UPGRADE_AVAILABLE <old> <new>` → tell user "spec-kit **v{new}** is available (tracking v{old}). Run `/specify-upgrade` to update."
-
 ## If no subskill is clear from ARGUMENTS
 
 Run `/specify-status` to show what exists, then ask what the user wants to do.

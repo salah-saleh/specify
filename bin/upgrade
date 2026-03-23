@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# specify/bin/upgrade — fetch latest spec-kit templates, update specify-init/SKILL.md,
+# bump versions, and publish to the distribution repo.
+set -euo pipefail
+
+SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+SKILLS_DIR="$(dirname "$SKILL_DIR")"
+INIT_SKILL="$SKILLS_DIR/specify-init/SKILL.md"
+DIST_REPO="$HOME/.claude/skills/specify-skills"
+VERSION_FILE="$SKILL_DIR/VERSION"
+
+# ── 1. Resolve latest spec-kit release tag ────────────────────────────────────
+echo "Checking latest spec-kit release..."
+TAG=$(curl -sf --max-time 10 \
+  "https://api.github.com/repos/github/spec-kit/releases/latest" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin).get('tag_name',''))" \
+  2>/dev/null || true)
+
+if [ -z "$TAG" ]; then
+  echo "ERROR: Could not reach GitHub API. Check your connection." >&2
+  exit 1
+fi
+
+LOCAL=$(cat "$VERSION_FILE" 2>/dev/null | tr -d '[:space:]' || echo "unknown")
+echo "Local spec-kit version : $LOCAL"
+echo "Latest spec-kit release: $TAG"
+
+# ── 2. Download the claude zip ────────────────────────────────────────────────
+ZIP_URL="https://github.com/github/spec-kit/releases/download/${TAG}/spec-kit-template-claude-sh-${TAG}.zip"
+TMP_DIR=$(mktemp -d)
+trap "rm -rf $TMP_DIR" EXIT
+
+echo "Downloading $ZIP_URL..."
+curl -sL --max-time 30 "$ZIP_URL" -o "$TMP_DIR/spec-kit.zip"
+unzip -q "$TMP_DIR/spec-kit.zip" -d "$TMP_DIR/spec-kit"
+
+TEMPLATES="$TMP_DIR/spec-kit/.specify/templates"
+for name in spec plan tasks constitution checklist; do
+  if [ ! -f "$TEMPLATES/${name}-template.md" ]; then
+    echo "ERROR: ${name}-template.md not found in release zip." >&2
+    exit 1
+  fi
+done
+
+# ── 3. Replace each ## Upstream Template section in specify-init/SKILL.md ─────
+echo "Updating templates in specify-init/SKILL.md..."
+python3 - "$INIT_SKILL" "$TEMPLATES" <<'PYEOF'
+import sys, re, pathlib
+
+skill_file = pathlib.Path(sys.argv[1])
+templates_dir = pathlib.Path(sys.argv[2])
+
+template_map = {
+    "spec":         "spec-template.md",
+    "plan":         "plan-template.md",
+    "tasks":        "tasks-template.md",
+    "constitution": "constitution-template.md",
+    "checklist":    "checklist-template.md",
+}
+
+content = skill_file.read_text()
+
+for section_name, filename in template_map.items():
+    new_body = (templates_dir / filename).read_text().rstrip("\n")
+    # Match: ## Upstream Template: <name>\n\n```markdown\n...\n```
+    pattern = (
+        r'(## Upstream Template: ' + re.escape(section_name) + r'\n\n```markdown\n)'
+        r'.*?'
+        r'(```)'
+    )
+    replacement = r'\g<1>' + new_body.replace('\\', '\\\\') + r'\n\g<2>'
+    new_content, count = re.subn(pattern, replacement, content, flags=re.DOTALL)
+    if count == 0:
+        print(f"WARNING: section '## Upstream Template: {section_name}' not found — skipped")
+    else:
+        print(f"  updated: {section_name}")
+        content = new_content
+
+skill_file.write_text(content)
+PYEOF
+
+# ── 4. Bump specify/VERSION ───────────────────────────────────────────────────
+TAG_CLEAN="${TAG#v}"
+echo "$TAG_CLEAN" > "$VERSION_FILE"
+echo "specify/VERSION → $TAG_CLEAN"
+
+# ── 5. Publish to dist repo ───────────────────────────────────────────────────
+if [ ! -d "$DIST_REPO/.git" ]; then
+  echo "Distribution repo not found at $DIST_REPO — skipping publish."
+  echo "To set it up: git clone git@github.com:salah-saleh/specify.git ~/.claude/skills/specify-skills"
+  exit 0
+fi
+
+echo "Syncing to distribution repo..."
+for skill_dir in "$SKILLS_DIR"/specify*/; do
+  name="$(basename "$skill_dir")"
+  [ "$name" = "specify-skills" ] && continue
+  cp -r "$skill_dir" "$DIST_REPO/"
+done
+
+# bump repo VERSION (patch)
+REPO_VER=$(cat "$DIST_REPO/VERSION" 2>/dev/null | tr -d '[:space:]' || echo "1.0.0")
+NEXT_VER=$(echo "$REPO_VER" | awk -F. '{printf "%s.%s.%s", $1, $2, $3+1}')
+echo "$NEXT_VER" > "$DIST_REPO/VERSION"
+
+cd "$DIST_REPO"
+git add -A
+if git diff --cached --quiet; then
+  echo "Nothing changed in dist repo — skipping commit."
+  exit 0
+fi
+git diff --cached --stat
+git -c commit.gpgsign=false commit -m "Release v${NEXT_VER} (spec-kit ${TAG})"
+git push origin main
+
+echo ""
+echo "Done."
+echo "  specify/VERSION : $TAG_CLEAN"
+echo "  repo VERSION    : $NEXT_VER"
+echo "  published       : salah-saleh/specify @ Release v${NEXT_VER} (spec-kit ${TAG})"
+PYEOF
