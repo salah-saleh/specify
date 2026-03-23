@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -e
+
+SKILLS_DIR="$HOME/.claude/skills"
+REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+mkdir -p "$SKILLS_DIR"
+
+for skill_dir in "$REPO_DIR"/specify*/; do
+  skill_name="$(basename "$skill_dir")"
+  echo "Installing $skill_name..."
+  ln -sfn "$skill_dir" "$SKILLS_DIR/$skill_name"
+done
+
+echo ""
+echo "Done. Restart Claude Code to activate the /specify skills."
