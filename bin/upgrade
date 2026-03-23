@@ -44,11 +44,11 @@ done
 
 # ── 3. Replace each ## Upstream Template section in specify-init/SKILL.md ─────
 echo "Updating templates in specify-init/SKILL.md..."
-python3 - "$INIT_SKILL" "$TEMPLATES" <<'PYEOF'
+python3 << PYEOF
 import sys, re, pathlib
 
-skill_file = pathlib.Path(sys.argv[1])
-templates_dir = pathlib.Path(sys.argv[2])
+skill_file = pathlib.Path("$INIT_SKILL")
+templates_dir = pathlib.Path("$TEMPLATES")
 
 template_map = {
     "spec":         "spec-template.md",
@@ -62,13 +62,12 @@ content = skill_file.read_text()
 
 for section_name, filename in template_map.items():
     new_body = (templates_dir / filename).read_text().rstrip("\n")
-    # Match: ## Upstream Template: <name>\n\n```markdown\n...\n```
     pattern = (
-        r'(## Upstream Template: ' + re.escape(section_name) + r'\n\n```markdown\n)'
+        r'(## Upstream Template: ' + re.escape(section_name) + r'\n\n\x60\x60\x60markdown\n)'
         r'.*?'
-        r'(```)'
+        r'(\x60\x60\x60)'
     )
-    replacement = r'\g<1>' + new_body.replace('\\', '\\\\') + r'\n\g<2>'
+    replacement = r'\g<1>' + new_body.replace('\\\\', '\\\\\\\\') + r'\n\g<2>'
     new_content, count = re.subn(pattern, replacement, content, flags=re.DOTALL)
     if count == 0:
         print(f"WARNING: section '## Upstream Template: {section_name}' not found — skipped")
