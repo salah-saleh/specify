@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# specify-update-check — check if upstream spec-kit has a new release.
+#
+# Output (one line, or nothing):
+#   JUST_UPGRADED <old> <new>       — upgrade just completed
+#   UPGRADE_AVAILABLE <old> <new>   — newer spec-kit release exists
+#   (nothing)                       — up to date or check skipped
+set -euo pipefail
+
+SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+STATE_DIR="$HOME/.gstack"
+CACHE_FILE="$STATE_DIR/specify-update-check"
+MARKER_FILE="$STATE_DIR/specify-just-upgraded-from"
+SNOOZE_FILE="$STATE_DIR/specify-update-snoozed"
+VERSION_FILE="$SKILL_DIR/VERSION"
+
+mkdir -p "$STATE_DIR"
+
+# Force flag — bust cache for manual upgrade check
+if [ "${1:-}" = "--force" ]; then
+  rm -f "$CACHE_FILE"
+fi
+
+# Read local version (tracks which spec-kit release our templates are based on)
+LOCAL=""
+if [ -f "$VERSION_FILE" ]; then
+  LOCAL="$(cat "$VERSION_FILE" 2>/dev/null | tr -d '[:space:]')"
+fi
+[ -z "$LOCAL" ] && exit 0
+
+# Check "just upgraded" marker
+if [ -f "$MARKER_FILE" ]; then
+  OLD="$(cat "$MARKER_FILE" 2>/dev/null | tr -d '[:space:]')"
+  rm -f "$MARKER_FILE" "$SNOOZE_FILE"
+  echo "UP_TO_DATE $LOCAL" > "$CACHE_FILE"
+  [ -n "$OLD" ] && echo "JUST_UPGRADED $OLD $LOCAL"
+  exit 0
+fi
+
+# Snooze check
+check_snooze() {
+  local remote_ver="$1"
+  [ ! -f "$SNOOZE_FILE" ] && return 1
+  local sv sl se
+  sv="$(awk '{print $1}' "$SNOOZE_FILE" 2>/dev/null || true)"
+  sl="$(awk '{print $2}' "$SNOOZE_FILE" 2>/dev/null || true)"
+  se="$(awk '{print $3}' "$SNOOZE_FILE" 2>/dev/null || true)"
+  [ -z "$sv" ] || [ -z "$sl" ] || [ -z "$se" ] && return 1
+  case "$sl" in *[!0-9]*) return 1 ;; esac
+  case "$se" in *[!0-9]*) return 1 ;; esac
+  [ "$sv" != "$remote_ver" ] && return 1
+  local duration
+  case "$sl" in
+    1) duration=86400 ;;
+    2) duration=172800 ;;
+    *) duration=604800 ;;
+  esac
+  local now expires
+  now="$(date +%s)"
+  expires=$(( se + duration ))
+  [ "$now" -lt "$expires" ] && return 0
+  return 1
+}
+
+# Cache check
+if [ -f "$CACHE_FILE" ]; then
+  CACHED="$(cat "$CACHE_FILE" 2>/dev/null || true)"
+  case "$CACHED" in
+    UP_TO_DATE*)        TTL=60 ;;
+    UPGRADE_AVAILABLE*) TTL=720 ;;
+    *)                  TTL=0 ;;
+  esac
+  STALE=$(find "$CACHE_FILE" -mmin +$TTL 2>/dev/null || true)
+  if [ -z "$STALE" ] && [ "$TTL" -gt 0 ]; then
+    case "$CACHED" in
+      UP_TO_DATE*)
+        CACHED_VER="$(echo "$CACHED" | awk '{print $2}')"
+        [ "$CACHED_VER" = "$LOCAL" ] && exit 0
+        ;;
+      UPGRADE_AVAILABLE*)
+        CACHED_OLD="$(echo "$CACHED" | awk '{print $2}')"
+        if [ "$CACHED_OLD" = "$LOCAL" ]; then
+          CACHED_NEW="$(echo "$CACHED" | awk '{print $3}')"
+          check_snooze "$CACHED_NEW" && exit 0
+          echo "$CACHED"
+          exit 0
+        fi
+        ;;
+    esac
+  fi
+fi
+
+# Fetch latest spec-kit release from GitHub API
+REMOTE=""
+REMOTE="$(curl -sf --max-time 5 \
+  "https://api.github.com/repos/github/spec-kit/releases/latest" 2>/dev/null \
+  | python3 -c "import sys,json; print(json.load(sys.stdin).get('tag_name','').lstrip('v'))" \
+  2>/dev/null || true)"
+
+# Validate looks like a version number
+if ! echo "$REMOTE" | grep -qE '^[0-9]+\.[0-9.]+$'; then
+  echo "UP_TO_DATE $LOCAL" > "$CACHE_FILE"
+  exit 0
+fi
+
+if [ "$LOCAL" = "$REMOTE" ]; then
+  echo "UP_TO_DATE $LOCAL" > "$CACHE_FILE"
+  exit 0
+fi
+
+echo "UPGRADE_AVAILABLE $LOCAL $REMOTE" > "$CACHE_FILE"
+check_snooze "$REMOTE" && exit 0
+echo "UPGRADE_AVAILABLE $LOCAL $REMOTE"
