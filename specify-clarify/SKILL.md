@@ -25,11 +25,13 @@ source "$HOME/.claude/skills/specify/bin/preamble.sh"
 
 If `SPEC_EXISTS` is `no`: "No spec found for branch `$_BRANCH`. Run `/specify-spec [description]` first." Stop.
 
+If `SPEC_STYLE` is `flat`: the spec file is `$_FLAT_SPEC_FILE`. Use that path everywhere `$_SPEC_DIR/spec.md` is referenced below.
+
 ---
 
 ## Step 1: Read and analyze the spec
 
-Read `$_SPEC_DIR/spec.md` deeply. Find:
+Read the spec file deeply (`$_FLAT_SPEC_FILE` if flat style, otherwise `$_SPEC_DIR/spec.md`). Find:
 - Ambiguous requirements (could mean more than one thing)
 - Missing acceptance criteria (user story has no Given/When/Then)
 - Unclear edge cases
@@ -49,7 +51,7 @@ Ask **one at a time** via AskUserQuestion. After each answer, update the spec be
 
 ## Step 3: Update spec in place
 
-For each answer, edit the relevant section of `$_SPEC_DIR/spec.md` to encode it naturally:
+For each answer, edit the relevant section of the spec file (`$_FLAT_SPEC_FILE` if flat style, otherwise `$_SPEC_DIR/spec.md`) to encode it naturally:
 - Add/update acceptance scenarios
 - Fill in missing edge cases
 - Clarify requirement wording
