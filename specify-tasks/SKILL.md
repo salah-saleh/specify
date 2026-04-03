@@ -28,11 +28,22 @@ If `PLAN_EXISTS` is `no`: "No plan found. Run `/specify-plan` first." Stop.
 
 ---
 
-## Step 1: Read all docs
+## Step 1: Determine file paths
 
-Read `$_SPEC_DIR/spec.md`, `$_SPEC_DIR/plan.md`, and `$_SPEC_DIR/research.md` (if present).
+**If `SPEC_STYLE` is `flat`:**
+- Spec file: `$_FLAT_SPEC_FILE`
+- Plan file: `$_SPEC_DIR/$_SPEC_BASE-plan.md`
+- Research file: `$_SPEC_DIR/$_SPEC_BASE-research.md` (if present)
+- Tasks file: `$_SPEC_DIR/$_SPEC_BASE-tasks.md`
 
-## Step 2: Generate tasks
+**If `SPEC_STYLE` is `branch`:**
+- Tasks file: `$_SPEC_DIR/tasks.md`
+
+## Step 2: Read all docs
+
+Read the spec, plan, and research files (paths from Step 1).
+
+## Step 3: Generate tasks
 
 Rules:
 - **One phase per user story** (P1 → P2 → P3), preceded by Setup and Foundation phases
@@ -43,9 +54,9 @@ Rules:
 - **Each story phase ends with a checkpoint**
 - Tests are included only if the spec or plan explicitly requests them
 
-Write to `$_SPEC_DIR/tasks.md`.
+Write to the tasks file (path from Step 1).
 
-## Step 3: Present
+## Step 4: Present
 
-Show tasks grouped by phase. Tell the user:
-> "Tasks written to `specs/$_BRANCH/tasks.md`. Start Phase 1 (Setup) → Phase 2 (Foundation) → then stories in priority order. Run `/specify-implement` to begin executing."
+Show tasks grouped by phase. Tell the user the path the tasks were written to, and:
+> "Start Phase 1 (Setup) → Phase 2 (Foundation) → then stories in priority order. Run `/specify-implement` to begin executing."

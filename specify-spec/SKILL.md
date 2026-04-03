@@ -32,13 +32,23 @@ If `SPECIFY_EXISTS` is `no`: tell the user "No `.specify/` found. Run `/specify-
 
 ---
 
-## Step 1: Determine spec directory
+## Step 1: Determine spec file path
 
 ```bash
 mkdir -p "$_SPEC_DIR"
 ```
 
-If `SPEC_EXISTS` is `yes`: ask "A spec already exists for branch `$_BRANCH`. Overwrite it, or update it?"
+**If `SPEC_STYLE` is `flat`:**
+- Derive a slug from the feature description in ARGUMENTS: lowercase, words joined by hyphens, max 5 words (e.g. `export-session-pdf`)
+- New spec filename: `$_TODAY-<slug>.md` (e.g. `26-04-03-export-session-pdf.md`)
+- Full path: `$_SPEC_DIR/$_TODAY-<slug>.md`
+- If `SPEC_EXISTS` is `yes` (an existing spec was found): ask "A spec already exists (`$_FLAT_SPEC_FILE`). Update it, or create a new one?"
+  - Update → edit `$_FLAT_SPEC_FILE` in place
+  - New → write to the new dated filename
+
+**If `SPEC_STYLE` is `branch`:**
+- If `SPEC_EXISTS` is `yes`: ask "A spec already exists for branch `$_BRANCH`. Overwrite it, or update it?"
+- Write to `$_SPEC_DIR/spec.md`
 
 ## Step 2: Gather context
 
@@ -46,7 +56,7 @@ Read in parallel:
 - `$_SPECIFY_DIR/memory/constitution.md` — project principles
 - `README.md` (repo root, if present)
 - `CLAUDE.md` (repo root, if present) — tech stack
-- Any existing `specs/*/spec.md` files — understand the pattern in this project
+- Existing spec files in `specs/` — understand the naming pattern and feature history
 - Relevant source files touched by this feature
 
 ## Step 3: Write the spec
@@ -59,11 +69,11 @@ The spec must have:
 - Edge cases
 - Success criteria
 
-Write to `$_SPEC_DIR/spec.md`.
+Write to the path determined in Step 1.
 
 ## Step 4: Present and confirm
 
 Show a summary: user stories + key requirements. Ask:
 > "Does this capture what you want? (yes / tell me what to change)"
 
-Iterate until approved. Tell the user: "Spec written to `specs/$_BRANCH/spec.md`. Run `/specify-plan` when ready."
+Iterate until approved. Tell the user the path the spec was written to, and: "Run `/specify-plan` when ready."

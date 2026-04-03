@@ -29,23 +29,34 @@ If `SPEC_EXISTS` is `no`: "No spec found for branch `$_BRANCH`. Run `/specify-sp
 
 ---
 
-## Step 1: Read all context
+## Step 1: Determine companion file paths
+
+**If `SPEC_STYLE` is `flat`:**
+- Spec file: `$_FLAT_SPEC_FILE` (e.g. `specs/26-04-03-export-session-pdf.md`)
+- Plan file: `$_SPEC_DIR/$_SPEC_BASE-plan.md` (e.g. `specs/26-04-03-export-session-pdf-plan.md`)
+- Research file: `$_SPEC_DIR/$_SPEC_BASE-research.md`
+
+**If `SPEC_STYLE` is `branch`:**
+- Plan file: `$_SPEC_DIR/plan.md`
+- Research file: `$_SPEC_DIR/research.md`
+
+## Step 2: Read all context
 
 Read in parallel:
-- `$_SPEC_DIR/spec.md` — the feature spec
+- The spec file (path from Step 1)
 - `$_SPECIFY_DIR/memory/constitution.md` — project principles
 - `CLAUDE.md` and `README.md` — tech stack
 - Relevant existing source files (models, APIs, services this feature touches)
 
-## Step 2: Research phase
+## Step 3: Research phase
 
-Think through and write `$_SPEC_DIR/research.md`:
+Think through and write to the research file (path from Step 1):
 - What already exists that can be reused?
 - Minimal data model for this feature
 - API contracts / interfaces needed
 - Key risks or unknowns
 
-## Step 3: Write the plan
+## Step 4: Write the plan
 
 Fill in the plan template. No `[BRACKET]` placeholders left behind. Must include:
 - Technical context (language, deps, storage, testing)
@@ -54,11 +65,11 @@ Fill in the plan template. No `[BRACKET]` placeholders left behind. Must include
 - Key decisions with rationale
 - Risks / unknowns
 
-Write to `$_SPEC_DIR/plan.md`.
+Write to the plan file (path from Step 1).
 
-## Step 4: Present and confirm
+## Step 5: Present and confirm
 
 Summarize: tech context, project structure, key decisions. Ask:
 > "Does this plan look right? (yes / tell me what to change)"
 
-Tell the user: "Plan written to `specs/$_BRANCH/plan.md`. Run `/specify-tasks` when ready."
+Tell the user the path the plan was written to, and: "Run `/specify-tasks` when ready."
